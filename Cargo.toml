@@ -1,0 +1,25 @@
+[package]
+authors = ["Michael Neufeld <mj9eld@gmail.com>"]
+categories = ["embedded", "hardware-support", "no-std"]
+description = "BSP for Adafruit Clue."
+license = "MIT OR Apache-2.0"
+keywords = ["arm", "cortex-m", "nrf52", "hal"]
+name = "adafruit-clue"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+nrf52840-hal = "0.13.0"
+cortex-m = "0.7"
+embedded-hal = "0.2"
+
+[dev-dependencies]
+cortex-m-rt = ">=0.6, <0.8"
+nb = "1.0.0"
+panic-halt = "0.2.0"
+panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
+rtt-target = { version = "0.3.1", features = ["cortex-m"] }
+
+[features]
+rt = ["nrf52840-hal/rt"]
+default = ["rt"]
