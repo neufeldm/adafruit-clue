@@ -8,6 +8,8 @@ pub use cortex_m;
 pub use embedded_hal;
 pub use nrf52840_hal as hal;
 
+//use nrf52840_hal::twim;
+
 /// Exports traits that are usually needed when using this crate
 pub mod prelude {
     pub use nrf52840_hal::prelude::*;
@@ -17,10 +19,11 @@ pub mod prelude {
 // pub mod debug;
 
 use nrf52840_hal::{
-    gpio::{p0, p1, Disconnected, Input, Level, Output, Pin, PullUp, PushPull},
-    pac::{self as nrf52, CorePeripherals, Peripherals},
-    spim::{self, Frequency, Spim, MODE_0},
-    uarte::{self, Baudrate as UartBaudrate, Parity as UartParity, Uarte},
+    gpio::{p0, p1, Disconnected, Input, Level, Output, Pin, PullUp, PushPull,Floating},
+    pac::{self as pac,CorePeripherals, Peripherals},
+    //spim,
+    //spim::{self, Frequency, Spim, MODE_0},
+    //uarte::{self, Baudrate as UartBaudrate, Parity as UartParity, Uarte},
 };
 
 use embedded_hal::digital::v2::{InputPin, OutputPin};
@@ -28,8 +31,22 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 /// Provides access to all features of the nRF52840-DK board
 #[allow(non_snake_case)]
 pub struct Board {
-    corePeripherals: CorePeripherals,
-    peripherals: Peripherals,
+    pub corePeripherals: CorePeripherals,
+    //pub peripherals: Peripherals,
+    /// nRF52 peripheral: TIMER0
+    pub TIMER0: pac::TIMER0,
+
+    /// nRF52 peripheral: TIMER1
+    pub TIMER1: pac::TIMER1,
+
+    /// nRF52 peripheral: TIMER2
+    pub TIMER2: pac::TIMER2,
+
+    /// nRF52 peripheral: TIMER3
+    pub TIMER3: pac::TIMER3,
+
+    /// nRF52 peripheral: TIMER4
+    pub TIMER4: pac::TIMER4,
 
     /// The nRF52's pins which are not otherwise occupied on the nRF52840-DK
     pub pins: Pins,
@@ -47,6 +64,8 @@ pub struct Board {
 
     /// The Clue TFT pins
     pub tft: TFT,
+
+    pub sensors: Sensors,
 }
 
 impl Board {
@@ -77,6 +96,7 @@ impl Board {
     fn new(cp: CorePeripherals, p: Peripherals) -> Self {
         let pins0 = p0::Parts::new(p.P0);
         let pins1 = p1::Parts::new(p.P1);
+
 
         // XXX mneufeld clue is supposed to have 2MB of QSPI flash - figure out where
         // The nRF52840-DK has an 64MB SPI flash on board which can be interfaced through SPI or Quad SPI.
@@ -110,7 +130,13 @@ impl Board {
             //flash: flash_spim,
             //flash_cs,
             corePeripherals: cp,
-            peripherals: p,
+            //peripherals: p,
+
+            TIMER0: p.TIMER0,
+            TIMER1: p.TIMER1,
+            TIMER2: p.TIMER2,
+            TIMER3: p.TIMER3,
+            TIMER4: p.TIMER4,
 
             pins: Pins {
                 a0: pins0.p0_31,
@@ -145,8 +171,8 @@ impl Board {
             },
 
             sensors: Sensors {
-                sda: pins0.p0_24.into_floating_input().degrade();
-                scl: pins0.p0_25.into_floating_input().degrade();
+                sda: pins0.p0_24.into_floating_input().degrade(),
+                scl: pins0.p0_25.into_floating_input().degrade(),
             },
             // XXX CONFIG_NFCT_PINS_AS_GPIOS (done in NVRAM already?)
             // p0_09 is proximity light interrupt on clue
@@ -238,13 +264,13 @@ impl Led {
         self.0
     }
 
-    /// Enable the LED
-    pub fn enable(&mut self) {
+    /// Turn the LED on
+    pub fn on(&mut self) {
         self.0.set_low().unwrap()
     }
 
-    /// Disable the LED
-    pub fn disable(&mut self) {
+    /// Turn the LED off
+    pub fn off(&mut self) {
         self.0.set_high().unwrap()
     }
 }
@@ -288,27 +314,27 @@ pub struct TFT {
     pub dc: Pin<Output<PushPull>>,
     pub reset: Pin<Output<PushPull>>,
     pub backlight: Pin<Output<PushPull>>,
-    pub spim: Option<spim::Spim>,
+    //pub spim: Option<spim::Spim>,
 }
 
 impl TFT {
     pub const XSIZE: u16 = 240;
     pub const YSIZE: u16 = 240;
     // XXX how to pass in the spim?
-    pub fn setupSPIM<SPIMDEV>(self,spimdev: SPIMDEV) {
-        let tft_pins = spim::Pins {
-            sck: tft_sck,
-            miso: None,
-            mosi: Some(tft_mosi),
-        };
-        self.spim = spim::Spim::new(spimdev,tft_pins,spim::Frequency::M8,spim::MODE_3,122);
-    }
+    //pub fn setupSPIM<SPIMDEV>(self,spimdev: SPIMDEV) {
+    //    let tft_pins = spim::Pins {
+    //        sck: self.tft_sck,
+    //        miso: None,
+    //        mosi: Some(self.tft_mosi),
+    //    };
+    //    self.spim = spim::Spim::new(spimdev,tft_pins,spim::Frequency::M8,spim::MODE_3,122);
+    //}
 }
 
 pub struct Sensors {
     pub sda: Pin<Input<Floating>>,
     pub scl: Pin<Input<Floating>>,
-    pub twim: Option<twim::Twim>,
+    //pub twim: Option<twim::Twim>,
 }
 
 impl Sensors {
@@ -317,13 +343,13 @@ impl Sensors {
     pub const GESTURE: u8 = 0x39;
     pub const HUMIDITY: u8 = 0x44;
     pub const TEMPPRESSUE: u8 = 0x77;
-    pub fn setupTWIM<TWIMDEV>(self, twimdev: TWIMDEV) {
-        let sensor_i2c_pins = twim::Pins {
-            scl: self.scl,
-            sda: self.sda,
-        };
-        self.twim = twim::Twim::new(twimdev,sensor_i2c_pins,twim::Frequency::K400);
-    }
+    //pub fn setupTWIM<TWIMDEV>(self, twimdev: TWIMDEV) {
+        //let sensor_i2c_pins = twim::Pins {
+            //scl: self.scl,
+            //sda: self.sda,
+        //};
+        //self.twim = twim::Twim::new(twimdev,sensor_i2c_pins,twim::Frequency::K400);
+    //}
 }
 // The NFC pins on the nRF52840-DK board
 // XXX configure these as GPIO for the clue

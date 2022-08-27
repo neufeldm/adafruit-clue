@@ -9,17 +9,37 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-nrf52840-hal = "0.13.0"
-cortex-m = "0.7"
-embedded-hal = "0.2"
+nrf52840-hal = "0.15.1"
+cortex-m = "0.7.4"
+embedded-hal = "0.2.7"
+cortex-m-rt = ">=0.6, <0.8"
 
 [dev-dependencies]
-cortex-m-rt = ">=0.6, <0.8"
 nb = "1.0.0"
-panic-halt = "0.2.0"
-panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
-rtt-target = { version = "0.3.1", features = ["cortex-m"] }
+
+#defmt = { git = "https://github.com/knurling-rs/defmt", branch = "main" }
+#defmt-rtt = { git = "https://github.com/knurling-rs/defmt", branch = "main" }
+
+embedded-graphics = "0.7"
+st7789 = "0.6.1"
+display-interface = "0.4"
+display-interface-spi = "0.4"
+# gyro/accel
+lsm6ds33 = "0.3.0"
+# magnetometer
+lis3mdl = "0.1.0"
+# prox/gesture/light
+apds9960 = "0.1.0"
+# humidity
+#sht3x = "0.1.1"
+# temp/pressure
+bmp280-rs = "0.1.1"
+#cortex-m-semihosting = "0.3.3"
+#panic-halt = "0.2.0"
 
 [features]
 rt = ["nrf52840-hal/rt"]
 default = ["rt"]
+
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
