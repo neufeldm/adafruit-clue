@@ -1,22 +1,20 @@
-//! Board support crate for the Nordic nRF52840-DK
+//! Board support for Adafruit CLUE:
+//! https://www.adafruit.com/product/4500
 //!
-//! UARTE, SPIM and TWI should be functional,
-//! but might miss some features.
+//! Heavily based on existing board support crates:
+//! https://github.com/nrf-rs/nrf52840-dk
+//! https://github.com/nrf-rs/adafruit-nrf52-bluefruit-le
+
 #![no_std]
 
 pub use cortex_m;
 pub use embedded_hal;
 pub use nrf52840_hal as hal;
 
-//use nrf52840_hal::twim;
-
 /// Exports traits that are usually needed when using this crate
 pub mod prelude {
     pub use nrf52840_hal::prelude::*;
 }
-
-// TODO: Maybe we want a debug module like in the DWM1001-Dev implementation.
-// pub mod debug;
 
 use nrf52840_hal::{
     gpio::{p0, p1, Disconnected, Input, Level, Output, Pin, PullUp, PushPull,Floating},
@@ -28,33 +26,29 @@ use nrf52840_hal::{
 
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 
-/// Provides access to all features of the nRF52840-DK board
+/// Provides access to features of the CLUE board
 #[allow(non_snake_case)]
 pub struct Board {
     pub corePeripherals: CorePeripherals,
-    //pub peripherals: Peripherals,
-    /// nRF52 peripheral: TIMER0
+
     pub TIMER0: pac::TIMER0,
-
-    /// nRF52 peripheral: TIMER1
     pub TIMER1: pac::TIMER1,
-
-    /// nRF52 peripheral: TIMER2
     pub TIMER2: pac::TIMER2,
-
-    /// nRF52 peripheral: TIMER3
     pub TIMER3: pac::TIMER3,
-
-    /// nRF52 peripheral: TIMER4
     pub TIMER4: pac::TIMER4,
+
+    pub TWIM0: pac::TWIM0,
+    pub TWIM1: pac::TWIM1,
+
+    pub SPIM0: pac::SPIM0,
+    pub SPIM1: pac::SPIM1,
+    pub SPIM2: pac::SPIM2,
+    pub SPIM3: pac::SPIM3,
 
     /// The nRF52's pins which are not otherwise occupied on the nRF52840-DK
     pub pins: Pins,
 
     // XXX mneufeld clue is supposed to have 2MB of QSPI flash - figure this out
-    /// The nRF52840-DK SPI which is wired to the SPI flash
-    //pub flash: Spim<nrf52::SPIM2>,
-    //pub flash_cs: Pin<Output<PushPull>>,
 
     /// The LEDs on the Clue
     pub leds: Leds,
@@ -71,7 +65,7 @@ pub struct Board {
 impl Board {
     /// Take the peripherals safely
     ///
-    /// This method will return an instance of `nRF52840DK` the first time it is
+    /// This method will return an instance of `adafruit-clue` the first time it is
     /// called. It will return only `None` on subsequent calls.
     pub fn take() -> Option<Self> {
         Some(Self::new(CorePeripherals::take()?, Peripherals::take()?))
@@ -79,16 +73,16 @@ impl Board {
 
     /// Steal the peripherals
     ///
-    /// This method produces an instance of `nRF52840DK`, regardless of whether
+    /// This method produces an instance of `adafruit-clue`, regardless of whether
     /// another instance was create previously.
     ///
     /// # Safety
     ///
-    /// This method can be used to create multiple instances of `nRF52840DK`. Those
+    /// This method can be used to create multiple instances of `adafruit-clue`. Those
     /// instances can interfere with each other, causing all kinds of unexpected
     /// behavior and circumventing safety guarantees in many ways.
     ///
-    /// Always use `nRF52840DK::take`, unless you really know what you're doing.
+    /// Always use `adafruit-clue::take`, unless you really know what you're doing.
     pub unsafe fn steal() -> Self {
         Self::new(CorePeripherals::steal(), Peripherals::steal())
     }
@@ -97,46 +91,22 @@ impl Board {
         let pins0 = p0::Parts::new(p.P0);
         let pins1 = p1::Parts::new(p.P1);
 
-
-        // XXX mneufeld clue is supposed to have 2MB of QSPI flash - figure out where
-        // The nRF52840-DK has an 64MB SPI flash on board which can be interfaced through SPI or Quad SPI.
-        // As for now, only the normal SPI mode is available, so we are using this for the interface.
-        //let flash_spim = Spim::new(
-        //    p.SPIM2,
-        //    spim::Pins {
-        //        sck: pins0.p0_19.into_push_pull_output(Level::Low).degrade(),
-        //        mosi: Some(pins0.p0_20.into_push_pull_output(Level::Low).degrade()),
-        //        miso: Some(pins0.p0_21.into_floating_input().degrade()),
-        //    },
-        //    Frequency::K500,
-        //    MODE_0,
-        //    0,
-        //);
-        //let flash_cs = pins0.p0_17.into_push_pull_output(Level::High).degrade();
-
-        //let tft_spim = Spim::new(
-        //    p.SPIM0,
-        //    spim::Pins {
-        //        sck: pins0.p0_14.into_push_pull_output(Level::Low).degrade(),
-        //        mosi: Some(pins0.p0_15.into_push_pull_output(Level::Low).degrade()),
-        //        miso: None,
-        //    },
-        //    Frequency::K500, // XXX see if this is right...
-        //    MODE_0,
-        //    0,
-        //);
         Board {
-            // XXX mneufeld figure this out for clue
-            //flash: flash_spim,
-            //flash_cs,
             corePeripherals: cp,
-            //peripherals: p,
 
             TIMER0: p.TIMER0,
             TIMER1: p.TIMER1,
             TIMER2: p.TIMER2,
             TIMER3: p.TIMER3,
             TIMER4: p.TIMER4,
+
+            TWIM0: p.TWIM0,
+            TWIM1: p.TWIM1,
+
+            SPIM0: p.SPIM0,
+            SPIM1: p.SPIM1,
+            SPIM2: p.SPIM2,
+            SPIM3: p.SPIM3,
 
             pins: Pins {
                 a0: pins0.p0_31,
@@ -174,13 +144,6 @@ impl Board {
                 sda: pins0.p0_24.into_floating_input().degrade(),
                 scl: pins0.p0_25.into_floating_input().degrade(),
             },
-            // XXX CONFIG_NFCT_PINS_AS_GPIOS (done in NVRAM already?)
-            // p0_09 is proximity light interrupt on clue
-            // p0_10 is the white led
-            //nfc: NFC {
-            //    nfc_1: pins0.p0_09,
-            //    nfc_2: pins0.p0_10,
-            //},
         }
     }
 }
@@ -207,14 +170,6 @@ pub struct Pins {
     //pub MISO: p0::P0_06<Disconnected>, // (GPIO D14 / MISO)
     //pub MOSI: p0::P0_26<Disconnected>, // (GPIO D15 / MOSI)
 
-    // I2C sensor bus
-    //pub SCL: p0::P0_25<Disconnected>, // (GPIO D19 / SCL)
-    //pub SDA: p0::P0_24<Disconnected>, // (GPIO D20 / SDA)
-
-    //pub BUTTON_A: p1::P1_02<Disconnected>, // (GPIO D5 / Left button)
-    //pub BUTTON_B: p1::P1_10<Disconnected>, // (GPIO D11 / Right Button)
-
-    //pub RED_LED: p1::P1_01<Disconnected>, // (Red LED) circuitpython uses "L" for the name...
     //pub NEOPIXEL: p0::P0_16<Disconnected>, // (NeoPixel)
 
     //pub MICROPHONE_DATA: p0::P0_00<Disconnected>, // (PDM DAT)
@@ -223,15 +178,6 @@ pub struct Pins {
     //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
     //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
     //pub SPEAKER: p1::P1_00, // (Speaker/buzzer)
-
-
-    // TFT display 
-    //pub TFT_SCK: p0::P0_14,
-    //pub TFT_MOSI: p0::P0_15,
-    //pub TFT_CS: p0::P0_12,
-    //pub TFT_DC: p0::P0_13,
-    //pub TFT_RESET: p1::P1_03,
-    //pub TFT_BACKLIGHT: p1::P1_05,
   
     // QSPI pins (not exposed via any header / test point)
     //pub QSPI_CLK: p0::P0_19, // (QSPI CLK)
@@ -244,24 +190,18 @@ pub struct Pins {
 
 /// The LEDs on the Adafruit Clue
 pub struct Leds {
-    /// Adafruit Clue: Red LED, nrf52: P1.01
+    /// Red LED on back of Clue (P1_01 - circuitpython uses "L" for the name)
     pub red: Led,
-
-    /// Adafruit Clue: White LED, nRF52: P0.10
+    /// Twin white LEDs on front of Clue (P0_10)
     pub white: Led,
 }
 
-/// An LED on the nRF52840-DK board
+/// An LED control pin
 pub struct Led(Pin<Output<PushPull>>);
 
 impl Led {
     fn new<Mode>(pin: Pin<Mode>) -> Self {
         Led(pin.into_push_pull_output(Level::High))
-    }
-
-    /// Release the inner Pin to be used directly
-    pub fn release(self) -> Pin<Output<PushPull>> {
-        self.0
     }
 
     /// Turn the LED on
@@ -275,11 +215,11 @@ impl Led {
     }
 }
 
-/// The Buttons on the Adafruit Clue
+/// The buttons on the Adafruit Clue
 pub struct Buttons {
-    /// adafruit clue: Button a, nRF52: P1.02
+    /// Button A (P1_02 / GPIO D5 / Left button)
     pub button_a: Button,
-    /// adafruit clue: Button b, nRF52: P1.10
+    /// Button B: (P1_10 / GPIO D11 / Right Button)
     pub button_b: Button,
 }
 
@@ -291,22 +231,13 @@ impl Button {
         Button(pin.into_pullup_input())
     }
 
-    /// Release the inner Pin to be used directly
-    pub fn release(self) -> Pin<Input<PullUp>> {
-        self.0
-    }
-
     /// Button is pressed
-    pub fn is_pressed(&self) -> bool {
+    pub fn pressed(&self) -> bool {
         self.0.is_low().unwrap()
-    }
-
-    /// Button is released
-    pub fn is_released(&self) -> bool {
-        self.0.is_high().unwrap()
     }
 }
 
+/// Control pins for the Clue TFT
 pub struct TFT {
     pub sck: Pin<Output<PushPull>>,
     pub mosi: Pin<Output<PushPull>>,
@@ -314,27 +245,23 @@ pub struct TFT {
     pub dc: Pin<Output<PushPull>>,
     pub reset: Pin<Output<PushPull>>,
     pub backlight: Pin<Output<PushPull>>,
-    //pub spim: Option<spim::Spim>,
 }
 
 impl TFT {
     pub const XSIZE: u16 = 240;
     pub const YSIZE: u16 = 240;
-    // XXX how to pass in the spim?
-    //pub fn setupSPIM<SPIMDEV>(self,spimdev: SPIMDEV) {
-    //    let tft_pins = spim::Pins {
-    //        sck: self.tft_sck,
-    //        miso: None,
-    //        mosi: Some(self.tft_mosi),
-    //    };
-    //    self.spim = spim::Spim::new(spimdev,tft_pins,spim::Frequency::M8,spim::MODE_3,122);
-    //}
+    pub fn backlight_on(mut self) {
+        self.backlight.set_high().unwrap();
+    }
+    pub fn backlight_off(mut self) {
+        self.backlight.set_low().unwrap();
+    }
 }
 
+/// I2C pins for Clue sensors
 pub struct Sensors {
     pub sda: Pin<Input<Floating>>,
     pub scl: Pin<Input<Floating>>,
-    //pub twim: Option<twim::Twim>,
 }
 
 impl Sensors {
@@ -343,20 +270,4 @@ impl Sensors {
     pub const GESTURE: u8 = 0x39;
     pub const HUMIDITY: u8 = 0x44;
     pub const TEMPPRESSUE: u8 = 0x77;
-    //pub fn setupTWIM<TWIMDEV>(self, twimdev: TWIMDEV) {
-        //let sensor_i2c_pins = twim::Pins {
-            //scl: self.scl,
-            //sda: self.sda,
-        //};
-        //self.twim = twim::Twim::new(twimdev,sensor_i2c_pins,twim::Frequency::K400);
-    //}
 }
-// The NFC pins on the nRF52840-DK board
-// XXX configure these as GPIO for the clue
-//pub struct NFC {
-//    /// nRF52840-DK: NFC1, nRF52: P0.09
-//    pub nfc_1: p0::P0_09<Disconnected>,
-//
-//    /// nRF52840-DK: NFC2, nRF52: P0.10
-//    pub nfc_2: p0::P0_10<Disconnected>,
-//}
