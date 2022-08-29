@@ -250,10 +250,10 @@ pub struct TFT {
 impl TFT {
     pub const XSIZE: u16 = 240;
     pub const YSIZE: u16 = 240;
-    pub fn backlight_on(mut self) {
+    pub fn backlight_on(&mut self) {
         self.backlight.set_high().unwrap();
     }
-    pub fn backlight_off(mut self) {
+    pub fn backlight_off(&mut self) {
         self.backlight.set_low().unwrap();
     }
 }
