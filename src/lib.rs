@@ -29,7 +29,7 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 /// Provides access to features of the CLUE board
 #[allow(non_snake_case)]
 pub struct Board {
-    pub corePeripherals: CorePeripherals,
+    pub core_peripherals: CorePeripherals,
 
     pub TIMER0: pac::TIMER0,
     pub TIMER1: pac::TIMER1,
@@ -92,7 +92,7 @@ impl Board {
         let pins1 = p1::Parts::new(p.P1);
 
         Board {
-            corePeripherals: cp,
+            core_peripherals: cp,
 
             TIMER0: p.TIMER0,
             TIMER1: p.TIMER1,

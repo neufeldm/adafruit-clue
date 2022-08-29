@@ -25,9 +25,6 @@ fn main() -> ! {
     let mut timer = Timer::new(b.TIMER4);
 
     b.tft.backlight_on();
-    //let tft_reset = port1.p1_03.into_push_pull_output(Level::Low); // reset
-    //let _tft_cs = port0.p0_12.into_push_pull_output(Level::Low); // keep low while driving display
-    //let tft_dc = port0.p0_13.into_push_pull_output(Level::Low); // data/clock switch
     // TFT SPI
     let tft_pins = spim::Pins {
         sck: b.tft.sck,
@@ -37,7 +34,7 @@ fn main() -> ! {
     let tft_spi = spim::Spim::new(b.SPIM0,tft_pins,spim::Frequency::M8,spim::MODE_3,122);
     let tft_display_interface = SPIInterfaceNoCS::new(tft_spi,b.tft.dc);
     let mut display = ST7789::new(tft_display_interface,b.tft.reset,TFT::XSIZE,TFT::YSIZE);
-    let mut delay = Delay::new(b.corePeripherals.SYST);
+    let mut delay = Delay::new(b.core_peripherals.SYST);
     display.init(&mut delay).unwrap();
     display.set_orientation(Orientation::Landscape).unwrap();
     display.clear(Rgb565::BLACK).unwrap();
