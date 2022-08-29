@@ -16,10 +16,10 @@ fn main() -> ! {
         // Blink some LEDs
         b.leds.red.on();
         b.leds.white.off();
-        timer.delay_ms(100 as u32);
+        timer.delay_ms(500 as u32);
         b.leds.red.off();
         b.leds.white.on();
-        timer.delay_ms(100 as u32);
+        timer.delay_ms(500 as u32);
     }
 
 }

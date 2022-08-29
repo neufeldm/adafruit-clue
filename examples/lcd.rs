@@ -40,28 +40,24 @@ fn main() -> ! {
     let mut delay = Delay::new(b.corePeripherals.SYST);
     display.init(&mut delay).unwrap();
     display.set_orientation(Orientation::Landscape).unwrap();
-    let circle1 = Circle::new(Point::new(128,64),64).into_styled(PrimitiveStyle::with_fill(Rgb565::RED));
-    let circle2 = Circle::new(Point::new(64,64),64).into_styled(PrimitiveStyle::with_fill(Rgb565::GREEN));
-    let circle3 = Circle::new(Point::new(64,128),64).into_styled(PrimitiveStyle::with_fill(Rgb565::BLUE));
-    let circle4 = Circle::new(Point::new(128,128),64).into_styled(PrimitiveStyle::with_fill(Rgb565::WHITE));
-    let text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
-    let howdy = Text::new("Hello Kitty!", Point::new(10,210),text_style);
-    //let clear_text_rect = Rectangle::new(Point::new(0,200), Size::new(240,40)).into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK));
     display.clear(Rgb565::BLACK).unwrap();
-    circle1.draw(&mut display).unwrap();
-    circle2.draw(&mut display).unwrap();
-    circle3.draw(&mut display).unwrap();
-    circle4.draw(&mut display).unwrap();
-    howdy.draw(&mut display).unwrap();
-
+    let text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
+    Text::new("Hello Kitty!", Point::new(10,210),text_style).draw(&mut display).unwrap();
+    let make_circle = | x, y, color: Rgb565 | {
+        Circle::new(Point::new(x,y),64).into_styled(PrimitiveStyle::with_fill(color))
+    };
+    let mut circle_colors = [Rgb565::RED,Rgb565::GREEN,Rgb565::BLUE,Rgb565::WHITE];
     loop {
-        // Blink some LEDs
-        b.leds.red.on();
-        b.leds.white.off();
-        timer.delay_ms(100 as u32);
-        b.leds.red.off();
-        b.leds.white.on();
-        timer.delay_ms(100 as u32);
+        make_circle(128,64,circle_colors[0]).draw(&mut display).unwrap();
+        make_circle(64,64,circle_colors[1]).draw(&mut display).unwrap();
+        make_circle(64,128,circle_colors[2]).draw(&mut display).unwrap();
+        make_circle(128,128,circle_colors[3]).draw(&mut display).unwrap();
+        let last_color = circle_colors[circle_colors.len() - 1];
+        for i in (1..circle_colors.len()).rev() {
+            circle_colors[i] = circle_colors[i-1];
+        }
+        circle_colors[0] = last_color;
+        timer.delay_ms(1000 as u32);
     }
 
 }
