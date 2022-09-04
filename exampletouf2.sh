@@ -1,6 +1,5 @@
 
 #!/bin/sh
-echo "argc $#"
 if [[ $# -ne 1 ]]
 then
   echo "Usage:"

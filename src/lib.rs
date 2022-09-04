@@ -17,8 +17,8 @@ pub mod prelude {
 }
 
 use nrf52840_hal::{
-    gpio::{p0, p1, Disconnected, Input, Level, Output, Pin, PullUp, PushPull,Floating},
-    pac::{self as pac,CorePeripherals, Peripherals},
+    gpio::{p0, p1, Disconnected, Floating, Input, Level, Output, Pin, PullUp, PushPull},
+    pac::{self as pac, CorePeripherals, Peripherals},
     //spim,
     //spim::{self, Frequency, Spim, MODE_0},
     //uarte::{self, Baudrate as UartBaudrate, Parity as UartParity, Uarte},
@@ -45,11 +45,16 @@ pub struct Board {
     pub SPIM2: pac::SPIM2,
     pub SPIM3: pac::SPIM3,
 
+    pub UARTE0: pac::UARTE0,
+    pub UARTE1: pac::UARTE1,
+
+    pub USBD: pac::USBD,
+    pub CLOCK: pac::CLOCK,
+
     /// The nRF52's pins which are not otherwise occupied on the nRF52840-DK
     pub pins: Pins,
 
     // XXX mneufeld clue is supposed to have 2MB of QSPI flash - figure this out
-
     /// The LEDs on the Clue
     pub leds: Leds,
 
@@ -59,7 +64,8 @@ pub struct Board {
     /// The Clue TFT pins
     pub tft: TFT,
 
-    pub sensors: Sensors,
+    /// Clue I2C pins for sensors
+    pub sensors_i2c: I2C,
 }
 
 impl Board {
@@ -87,6 +93,19 @@ impl Board {
         Self::new(CorePeripherals::steal(), Peripherals::steal())
     }
 
+    // USB CDC identifiers
+    pub const USB_PRODUCT: &'static str = "Adafruit CLUE";
+    pub const USB_MANUFACTURER: &'static str = "Adafruit";
+    pub const USB_VID: u16 = 0x239A;
+    pub const USB_PID: u16 = 0x8072;
+
+    // Sensor I2C IDs
+    pub const I2C_GYROACCEL: u8 = 0x6A;
+    pub const I2C_MAGNETOMETER: u8 = 0x1c;
+    pub const I2C_GESTURE: u8 = 0x39;
+    pub const I2C_HUMIDITY: u8 = 0x44;
+    pub const I2C_TEMPPRESSUE: u8 = 0x77;
+
     fn new(cp: CorePeripherals, p: Peripherals) -> Self {
         let pins0 = p0::Parts::new(p.P0);
         let pins1 = p1::Parts::new(p.P1);
@@ -107,6 +126,12 @@ impl Board {
             SPIM1: p.SPIM1,
             SPIM2: p.SPIM2,
             SPIM3: p.SPIM3,
+
+            UARTE0: p.UARTE0,
+            UARTE1: p.UARTE1,
+
+            USBD: p.USBD,
+            CLOCK: p.CLOCK,
 
             pins: Pins {
                 a0: pins0.p0_31,
@@ -140,7 +165,7 @@ impl Board {
                 button_b: Button::new(pins1.p1_10.degrade()),
             },
 
-            sensors: Sensors {
+            sensors_i2c: I2C {
                 sda: pins0.p0_24.into_floating_input().degrade(),
                 scl: pins0.p0_25.into_floating_input().degrade(),
             },
@@ -165,7 +190,7 @@ pub struct Pins {
     pub d8: p1::P1_07<Disconnected>, // (GPIO D8)
     pub d9: p0::P0_27<Disconnected>, // (GPIO D9)
 
-    // XXX primary UART?
+    // XXX resolve these
     //pub SCK: p0::P0_08<Disconnected>, // (GPIO D13 / SCK)
     //pub MISO: p0::P0_06<Disconnected>, // (GPIO D14 / MISO)
     //pub MOSI: p0::P0_26<Disconnected>, // (GPIO D15 / MOSI)
@@ -178,7 +203,7 @@ pub struct Pins {
     //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
     //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
     //pub SPEAKER: p1::P1_00, // (Speaker/buzzer)
-  
+
     // QSPI pins (not exposed via any header / test point)
     //pub QSPI_CLK: p0::P0_19, // (QSPI CLK)
     //pub QSPI_CS: p0::P0_20, // (QSPI CS)
@@ -259,15 +284,8 @@ impl TFT {
 }
 
 /// I2C pins for Clue sensors
-pub struct Sensors {
+pub struct I2C {
     pub sda: Pin<Input<Floating>>,
     pub scl: Pin<Input<Floating>>,
 }
 
-impl Sensors {
-    pub const GYROACCEL: u8 = 0x6A;
-    pub const MAGNETOMETER: u8 = 0x1c;
-    pub const GESTURE: u8 = 0x39;
-    pub const HUMIDITY: u8 = 0x44;
-    pub const TEMPPRESSUE: u8 = 0x77;
-}
