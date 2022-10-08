@@ -39,6 +39,7 @@ bmp280-rs = "0.1.1"
 usb-device = "0.2.9"
 usbd-serial = "0.1.1"
 #nrf-usbd = "0.1.1"
+heapless = "0.7.9"
 
 [features]
 rt = ["nrf52840-hal/rt"]
