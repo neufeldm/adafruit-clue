@@ -9,6 +9,8 @@ use lsm6ds33::Lsm6ds33;
 use lsm6ds33::{AccelerometerScale, AccelerometerBandwidth, AccelerometerOutput};
 use lsm6ds33::{GyroscopeFullScale,GyroscopeOutput};
 
+use apds9960::Apds9960;
+
 //use core::alloc::Layout;
 
 use display_interface_spi::SPIInterfaceNoCS;
@@ -20,6 +22,7 @@ use embedded_graphics::{
     mono_font::{ascii::FONT_7X13,MonoTextStyle},
     text::Text,
 };
+use shared_bus;
 
 
 use core::fmt::Write;
@@ -33,7 +36,8 @@ fn main() -> ! {
         sda: b.sensors_i2c.sda,
     };
     let sensor_i2c = twim::Twim::new(b.TWIM1,sensor_i2c_pins,twim::Frequency::K400);
-    let mut gyro_accel = Lsm6ds33::new(sensor_i2c,Board::I2C_GYROACCEL).unwrap();
+    let shared_sensor_i2c = shared_bus::BusManagerSimple::new(sensor_i2c);
+    let mut gyro_accel = Lsm6ds33::new(shared_sensor_i2c.acquire_i2c(),Board::I2C_GYROACCEL).unwrap();
     gyro_accel.set_accelerometer_scale(AccelerometerScale::G02).unwrap();
     gyro_accel.set_accelerometer_bandwidth(AccelerometerBandwidth::Freq100).unwrap();
     gyro_accel.set_accelerometer_output(AccelerometerOutput::Rate104).unwrap();
@@ -41,6 +45,9 @@ fn main() -> ! {
     gyro_accel.set_gyroscope_output(GyroscopeOutput::Rate104).unwrap();
     gyro_accel.set_low_power_mode(false).unwrap();
 
+    let mut prox_rgb_gesture = Apds9960::new(shared_sensor_i2c.acquire_i2c());
+    prox_rgb_gesture.enable().unwrap();
+    prox_rgb_gesture.enable_light().unwrap();
 
     b.tft.backlight_on();
     // TFT SPI
@@ -56,19 +63,41 @@ fn main() -> ! {
     display.init(&mut delay).unwrap();
     display.set_orientation(Orientation::Landscape).unwrap();
     display.clear(Rgb565::BLACK).unwrap();
-    let text_style = MonoTextStyle::new(&FONT_7X13, Rgb565::WHITE);
-    let text_rect_black = Rectangle::new(Point::new(0,200), Size::new(240,40)).into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK));
-    //Text::new("Hello Kitty!", Point::new(10,210),text_style).draw(&mut display).unwrap();
     let mut timer = Timer::new(b.TIMER4);
+
+    let rgb_circle = | x, y, color: Rgb565 | {
+        Circle::new(Point::new(x,y),64).into_styled(PrimitiveStyle::with_fill(color))
+    };
+
+    let clear_text_rect = | x, y | {
+        Rectangle::new(Point::new(x,y), Size::new(240,20)).into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+    };
+
     loop {
+        // gyro/accel
         let (x,y,z) = gyro_accel.read_gyro().unwrap();
-        let mut gyrostring: String<128> = String::new();
+        let mut gyrostring: String<64> = String::new();
         write!(gyrostring,"GYRO ({:.4},{:.4},{:.4})",x,y,z).unwrap();
-        let gyrotext = Text::new(&gyrostring,Point::new(10,210),text_style);
-        text_rect_black.draw(&mut display).unwrap();
-        gyrotext.draw(&mut display).unwrap();
+        clear_text_rect(0,220).draw(&mut display).unwrap();
+        text(0,220,&gyrostring).draw(&mut display).unwrap();
+
+        // prox/rgb/gesture
+        let rgb = prox_rgb_gesture.read_light().unwrap();
+        let circle_color = Rgb565::new(rgb.red as u8,rgb.green as u8,rgb.blue as u8);
+        rgb_circle(64,64,circle_color).draw(&mut display).unwrap();
+
+        let mut rgbstring: String<64> = String::new();
+        write!(rgbstring,"RGB ({},{},{})",rgb.red,rgb.green,rgb.blue).unwrap();
+        clear_text_rect(0,200).draw(&mut display).unwrap();
+        text(0,200,&rgbstring).draw(&mut display).unwrap();
+
         timer.delay_ms(250 as u32);
     }
+}
+
+fn text(x: i32, y: i32, s: &str) -> Text<MonoTextStyle<Rgb565>> {
+    let text_style = MonoTextStyle::new(&FONT_7X13, Rgb565::WHITE);
+    Text::new(s,Point::new(x+10,y+10),text_style)
 }
 
 #[panic_handler] // panicking behavior

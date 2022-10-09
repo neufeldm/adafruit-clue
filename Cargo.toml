@@ -16,7 +16,7 @@ cortex-m-rt = ">=0.6, <0.8"
 
 [dev-dependencies]
 nb = "1.0.0"
-
+shared-bus = "0.2.4"
 #defmt = { git = "https://github.com/knurling-rs/defmt", branch = "main" }
 #defmt-rtt = { git = "https://github.com/knurling-rs/defmt", branch = "main" }
 
