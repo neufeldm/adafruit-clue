@@ -5,13 +5,16 @@ use adafruit_clue::{Board,TFT};
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
 use nrf52840_hal::{Timer,twim,spim,Delay};
+// accelerometer/Gyro
 use lsm6ds33::Lsm6ds33;
 use lsm6ds33::{AccelerometerScale, AccelerometerBandwidth, AccelerometerOutput};
 use lsm6ds33::{GyroscopeFullScale,GyroscopeOutput};
 
+// proximity/gesture/color
 use apds9960::Apds9960;
 
-//use core::alloc::Layout;
+// pressure/temperature
+use bmp280_rs;
 
 use display_interface_spi::SPIInterfaceNoCS;
 use st7789::{Orientation, ST7789};
@@ -49,6 +52,16 @@ fn main() -> ! {
     prox_rgb_gesture.enable().unwrap();
     prox_rgb_gesture.enable_light().unwrap();
 
+    let temp_pressure_config = bmp280_rs::Config {
+        measurement_standby_time_millis: Some(bmp280_rs::MeasurementStandbyTimeMillis::ZeroPointFive),
+        pressure_oversampling: bmp280_rs::PressureOversampling::Four,
+        temperature_oversampling: bmp280_rs::TemperatureOversampling::Four,
+        iir_filter: bmp280_rs::IIRFilterCoefficient::Four,
+    };
+    let mut temp_pressure_i2c = shared_sensor_i2c.acquire_i2c();
+    let temp_pressure_sleep = bmp280_rs::BMP280::new(&mut temp_pressure_i2c,bmp280_rs::I2CAddress::SdoPulledUp,temp_pressure_config).unwrap();
+    let mut temp_pressure = temp_pressure_sleep.into_normal_mode(&mut temp_pressure_i2c).unwrap();
+
     b.tft.backlight_on();
     // TFT SPI
     let tft_pins = spim::Pins {
@@ -65,8 +78,8 @@ fn main() -> ! {
     display.clear(Rgb565::BLACK).unwrap();
     let mut timer = Timer::new(b.TIMER4);
 
-    let rgb_circle = | x, y, color: Rgb565 | {
-        Circle::new(Point::new(x,y),64).into_styled(PrimitiveStyle::with_fill(color))
+    let rgb_circle = | x, y, size, color: Rgb565 | {
+        Circle::new(Point::new(x,y),size).into_styled(PrimitiveStyle::with_fill(color))
     };
 
     let clear_text_rect = | x, y | {
@@ -84,12 +97,23 @@ fn main() -> ! {
         // prox/rgb/gesture
         let rgb = prox_rgb_gesture.read_light().unwrap();
         let circle_color = Rgb565::new(rgb.red as u8,rgb.green as u8,rgb.blue as u8);
-        rgb_circle(64,64,circle_color).draw(&mut display).unwrap();
-
         let mut rgbstring: String<64> = String::new();
         write!(rgbstring,"RGB ({},{},{})",rgb.red,rgb.green,rgb.blue).unwrap();
         clear_text_rect(0,200).draw(&mut display).unwrap();
-        text(0,200,&rgbstring).draw(&mut display).unwrap();
+        rgb_circle(10,200,10,circle_color).draw(&mut display).unwrap();
+        text(20,200,&rgbstring).draw(&mut display).unwrap();
+
+        // temp/pressure
+        let temp = temp_pressure.read_temperature(&mut temp_pressure_i2c).unwrap();
+        let pressure = temp_pressure.read_pressure(&mut temp_pressure_i2c).unwrap();
+        let mut tempstring: String<64> = String::new();
+        write!(tempstring,"TEMP {}",temp).unwrap();
+        clear_text_rect(0,180).draw(&mut display).unwrap();
+        text(0,180,&tempstring).draw(&mut display).unwrap();
+        let mut pressstring: String<64> = String::new();
+        write!(pressstring,"PRESSURE {}",pressure).unwrap();
+        clear_text_rect(0,160).draw(&mut display).unwrap();
+        text(0,160,&pressstring).draw(&mut display).unwrap();
 
         timer.delay_ms(250 as u32);
     }

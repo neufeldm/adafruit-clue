@@ -104,7 +104,7 @@ impl Board {
     pub const I2C_MAGNETOMETER: u8 = 0x1c;
     pub const I2C_GESTURE: u8 = 0x39;
     pub const I2C_HUMIDITY: u8 = 0x44;
-    pub const I2C_TEMPPRESSUE: u8 = 0x77;
+    pub const I2C_TEMPPRESSURE: u8 = 0x77;
 
     fn new(cp: CorePeripherals, p: Peripherals) -> Self {
         let pins0 = p0::Parts::new(p.P0);
