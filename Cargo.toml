@@ -27,11 +27,13 @@ display-interface-spi = "0.4"
 # gyro/accel
 lsm6ds33 = "0.3.0"
 # magnetometer
-lis3mdl = "0.1.0"
+#lis3mdl = "0.1.0"
+lis3mdl = { git = "https://github.com/ryanrightmer/lis3mdl" }
 # prox/gesture/light
 apds9960 = "0.1.0"
 # humidity
 #sht3x = "0.1.1"
+sht3x = { git = "https://github.com/reitermarkus/sht3x-rs" }
 # temp/pressure
 bmp280-rs = "0.1.1"
 #cortex-m-semihosting = "0.3.3"

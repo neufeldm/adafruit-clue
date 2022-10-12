@@ -16,6 +16,12 @@ use apds9960::Apds9960;
 // pressure/temperature
 use bmp280_rs;
 
+// magnetometer
+use lis3mdl;
+
+// humidity
+use sht3x;
+
 use display_interface_spi::SPIInterfaceNoCS;
 use st7789::{Orientation, ST7789};
 use embedded_graphics::pixelcolor::Rgb565;
@@ -62,6 +68,12 @@ fn main() -> ! {
     let temp_pressure_sleep = bmp280_rs::BMP280::new(&mut temp_pressure_i2c,bmp280_rs::I2CAddress::SdoPulledUp,temp_pressure_config).unwrap();
     let mut temp_pressure = temp_pressure_sleep.into_normal_mode(&mut temp_pressure_i2c).unwrap();
 
+    let magnet_i2c = shared_sensor_i2c.acquire_i2c();
+    let mut magnetometer = lis3mdl::Lis3mdl::new(magnet_i2c,lis3mdl::Address::Addr1C).unwrap();
+
+    let humidity_i2c = shared_sensor_i2c.acquire_i2c();
+    let mut humidity = sht3x::SHT3x::new(humidity_i2c,sht3x::Address::Low);
+
     b.tft.backlight_on();
     // TFT SPI
     let tft_pins = spim::Pins {
@@ -98,7 +110,7 @@ fn main() -> ! {
         let rgb = prox_rgb_gesture.read_light().unwrap();
         let circle_color = Rgb565::new(rgb.red as u8,rgb.green as u8,rgb.blue as u8);
         let mut rgbstring: String<64> = String::new();
-        write!(rgbstring,"RGB ({},{},{})",rgb.red,rgb.green,rgb.blue).unwrap();
+        write!(rgbstring,"RGB ({},{},{},{})",rgb.red,rgb.green,rgb.blue,rgb.clear).unwrap();
         clear_text_rect(0,200).draw(&mut display).unwrap();
         rgb_circle(10,200,10,circle_color).draw(&mut display).unwrap();
         text(20,200,&rgbstring).draw(&mut display).unwrap();
@@ -114,6 +126,20 @@ fn main() -> ! {
         write!(pressstring,"PRESSURE {}",pressure).unwrap();
         clear_text_rect(0,160).draw(&mut display).unwrap();
         text(0,160,&pressstring).draw(&mut display).unwrap();
+
+        // magnetometer
+        let xyz = magnetometer.get_mag_axes_mgauss().unwrap();
+        let mut magstring: String<64> = String::new();
+        write!(magstring,"MAG ({},{},{})",xyz.x,xyz.y,xyz.z).unwrap();
+        clear_text_rect(0,140).draw(&mut display).unwrap();
+        text(0,140,&magstring).draw(&mut display).unwrap();
+
+        // humidity
+        let h = humidity.measure(sht3x::Repeatability::High,&mut delay).unwrap();
+        let mut humstring: String<64> = String::new();
+        write!(humstring,"HUMID {} TEMP {}",h.humidity,h.temperature).unwrap();
+        clear_text_rect(0,120).draw(&mut display).unwrap();
+        text(0,120,&humstring).draw(&mut display).unwrap();
 
         timer.delay_ms(250 as u32);
     }
