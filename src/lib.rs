@@ -50,6 +50,7 @@ pub struct Board {
 
     pub USBD: pac::USBD,
     pub CLOCK: pac::CLOCK,
+    pub PDM: pac::PDM,
 
     /// The nRF52's pins which are not otherwise occupied on the nRF52840-DK
     pub pins: Pins,
@@ -106,6 +107,12 @@ impl Board {
     pub const I2C_HUMIDITY: u8 = 0x44;
     pub const I2C_TEMPPRESSURE: u8 = 0x77;
 
+    // PDM port/pin IDs
+    pub const PDM_DATA_PORT: bool = false;
+    pub const PDM_DATA_PIN: u8 = 0x00;
+    pub const PDM_CLOCK_PORT: bool = false;
+    pub const PDM_CLOCK_PIN: u8 = 0x01;
+
     fn new(cp: CorePeripherals, p: Peripherals) -> Self {
         let pins0 = p0::Parts::new(p.P0);
         let pins1 = p1::Parts::new(p.P1);
@@ -132,6 +139,7 @@ impl Board {
 
             USBD: p.USBD,
             CLOCK: p.CLOCK,
+            PDM: p.PDM,
 
             pins: Pins {
                 a0: pins0.p0_31,
@@ -146,6 +154,9 @@ impl Board {
                 d7: pins0.p0_07,
                 d8: pins1.p1_07,
                 d9: pins0.p0_27,
+                neopixel: pins0.p0_16,
+                pdm_data: pins0.p0_00,
+                pdm_clock: pins0.p0_01,
             },
             tft: TFT {
                 sck: pins0.p0_14.into_push_pull_output(Level::Low).degrade(),
@@ -195,10 +206,10 @@ pub struct Pins {
     //pub MISO: p0::P0_06<Disconnected>, // (GPIO D14 / MISO)
     //pub MOSI: p0::P0_26<Disconnected>, // (GPIO D15 / MOSI)
 
-    //pub NEOPIXEL: p0::P0_16<Disconnected>, // (NeoPixel)
+    pub neopixel: p0::P0_16<Disconnected>, // (NeoPixel)
 
-    //pub MICROPHONE_DATA: p0::P0_00<Disconnected>, // (PDM DAT)
-    //pub MICROPHONE_CLOCK: p0::P0_01<Disconnected>, // (PDM CLOCK)
+    pub pdm_data: p0::P0_00<Disconnected>, // (PDM DAT)
+    pub pdm_clock: p0::P0_01<Disconnected>, // (PDM CLOCK)
 
     //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
     //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
