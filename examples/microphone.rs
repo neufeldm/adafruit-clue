@@ -5,6 +5,7 @@ use core::convert::TryInto;
 use adafruit_clue::{Board,TFT};
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
+use nrf52840_hal::clocks::Clocks;
 use nrf52840_hal::{Timer,spim,Delay,gpio};
 
 use display_interface_spi::SPIInterfaceNoCS;
@@ -34,12 +35,8 @@ unsafe fn main() -> ! {
     b.pins.pdm_clock.into_push_pull_output(gpio::Level::Low);
     b.pins.pdm_data.into_floating_input();
 
-    b.CLOCK.tasks_hfclkstart.write(|w| {
-        w.bits(1)
-    });
-    while b.CLOCK.events_hfclkstarted.read().events_hfclkstarted().bit_is_clear() {}
-    while b.CLOCK.hfclkstat.read().state().is_not_running() {}
-
+    // we need the high frequency oscillator enabled
+    Clocks::new(b.CLOCK).enable_ext_hfosc();
 
     // configure the PDM to use the correct pins
     b.PDM.psel.clk.write(|w| {
