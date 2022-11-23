@@ -155,8 +155,8 @@ impl Board {
                 d8: pins1.p1_07,
                 d9: pins0.p0_27,
                 neopixel: pins0.p0_16,
-                pdm_data: pins0.p0_00,
-                pdm_clock: pins0.p0_01,
+                pdm_data: pins0.p0_00.into_floating_input(),
+                pdm_clock: pins0.p0_01.into_push_pull_output(Level::Low),
             },
             tft: TFT {
                 sck: pins0.p0_14.into_push_pull_output(Level::Low).degrade(),
@@ -208,8 +208,8 @@ pub struct Pins {
 
     pub neopixel: p0::P0_16<Disconnected>, // (NeoPixel)
 
-    pub pdm_data: p0::P0_00<Disconnected>, // (PDM DAT)
-    pub pdm_clock: p0::P0_01<Disconnected>, // (PDM CLOCK)
+    pub pdm_data: p0::P0_00<Input<Floating>>, // (PDM DAT)
+    pub pdm_clock: p0::P0_01<Output<PushPull>>, // (PDM CLOCK)
 
     //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
     //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
@@ -300,3 +300,76 @@ pub struct I2C {
     pub scl: Pin<Input<Floating>>,
 }
 
+pub struct Microphone {
+    pdm: pac::PDM,
+}
+
+impl Microphone {
+    pub fn new(pdm: pac::PDM) -> Self {
+        Microphone {
+            pdm: pdm,
+        }
+    }
+    pub fn enable(&mut self) {
+        // configure the PDM to use the correct pins
+        self.pdm.psel.clk.write(|w| {
+            w.port().bit(Board::PDM_CLOCK_PORT);
+            unsafe {
+                w.pin().bits(Board::PDM_CLOCK_PIN);
+            }
+            w.connect().clear_bit()
+        });
+        self.pdm.psel.din.write(|w| {
+            unsafe {
+                w.port().bit(Board::PDM_DATA_PORT);
+                w.pin().bits(Board::PDM_DATA_PIN);
+                w.connect().clear_bit()
+            }
+        });
+        // enable the PDM
+        self.pdm.enable.write(|w| { w.enable().set_bit() });
+        // mono/rising edge
+        self.pdm.mode.write(|w| {
+            w.operation().set_bit();
+            w.edge().clear_bit()
+        });
+    }
+    pub fn enable_interrupt() {}
+    pub fn disable_interrupt() {}
+    pub fn set_sample_buffer(&self,buf: &[u16]) {
+        unsafe {
+            self.pdm.sample.ptr.write(|w| { w.bits(buf.as_ptr() as u32) });
+            self.pdm.sample.maxcnt.write(|w|{ w.bits(buf.len() as u32) });
+        }
+    }
+    pub const MIN_GAIN_HALFDB: i8 = -40;
+    pub const MAX_GAIN_HALFDB: i8 = 40;
+    pub fn set_gain(&self,half_db_gain: i8) {
+        let mut g = half_db_gain;
+        unsafe {
+            if half_db_gain < Microphone::MIN_GAIN_HALFDB {
+                g = Microphone::MIN_GAIN_HALFDB;
+            } else if half_db_gain > Microphone::MIN_GAIN_HALFDB {
+                g = Microphone::MAX_GAIN_HALFDB;
+            }
+            // The gain is offset by the minimum gain to 0, so adjust
+            // the signed value here to match what the register wants.
+            g -= Microphone::MIN_GAIN_HALFDB;
+            self.pdm.gainl.write(|w| { w.gainl().bits(g as u8) } );
+            self.pdm.gainr.write(|w| { w.gainr().bits(g as u8) } );
+        }
+    }
+
+    pub fn start_sampling(&self) {
+        self.pdm.tasks_start.write(|w| { w.tasks_start().set_bit() });
+    }
+
+    pub fn sampling_started(&self) -> bool {
+        self.pdm.events_started.read().events_started().bit_is_set()
+    }
+
+    pub fn clear_sampling_started(&self) {
+        self.pdm.events_started.write(|w| { w.events_started().clear_bit() });
+    }
+
+}

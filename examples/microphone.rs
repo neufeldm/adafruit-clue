@@ -2,11 +2,11 @@
 #![no_std]
 
 use core::convert::TryInto;
-use adafruit_clue::{Board,TFT};
+use adafruit_clue::{Board,TFT,Microphone};
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
 use nrf52840_hal::clocks::Clocks;
-use nrf52840_hal::{Timer,spim,Delay,gpio};
+use nrf52840_hal::{Timer,spim,Delay};
 
 use display_interface_spi::SPIInterfaceNoCS;
 use st7789::{Orientation, ST7789};
@@ -15,7 +15,7 @@ use embedded_graphics::primitives::*;
 use embedded_graphics::prelude::*;
 
 #[cortex_m_rt::entry]
-unsafe fn main() -> ! {
+fn main() -> ! {
     let mut b = Board::take().unwrap();
     b.tft.backlight_on();
     // TFT SPI
@@ -31,33 +31,13 @@ unsafe fn main() -> ! {
     display.init(&mut delay).unwrap();
     display.set_orientation(Orientation::Landscape).unwrap();
     display.clear(Rgb565::BLACK).unwrap();
-    // rig pins into proper mode
-    b.pins.pdm_clock.into_push_pull_output(gpio::Level::Low);
-    b.pins.pdm_data.into_floating_input();
 
-    // we need the high frequency oscillator enabled
-    Clocks::new(b.CLOCK).enable_ext_hfosc();
+    // we need the high frequency oscillator enabled for the microphone
+    let c = Clocks::new(b.CLOCK);
+    c.enable_ext_hfosc();
+    let mut mic = Microphone::new(b.PDM);
+    mic.enable();
 
-    // configure the PDM to use the correct pins
-    b.PDM.psel.clk.write(|w| {
-        w.port().bit(Board::PDM_CLOCK_PORT);
-        // XXX unsafe
-        w.pin().bits(Board::PDM_CLOCK_PIN);
-        w.connect().clear_bit()
-    });
-    b.PDM.psel.din.write(|w| {
-        w.port().bit(Board::PDM_DATA_PORT);
-        // XXX unsafe
-        w.pin().bits(Board::PDM_DATA_PIN);
-        w.connect().clear_bit()
-    });
-    // enable the PDM
-    b.PDM.enable.write(|w| { w.enable().set_bit() });
-    // mono/rising edge
-    b.PDM.mode.write(|w| {
-        w.operation().set_bit();
-        w.edge().clear_bit()
-    });
     // XXX leaving gain, etc. at default values for now...
     const SAMPLECOUNT: u16 = 2048;
     const BUCKETCOUNT: usize = 120;
@@ -70,11 +50,10 @@ unsafe fn main() -> ! {
     let rect = | b , y, height, c | {
         Rectangle::new(Point::new((b as u32*BARWIDTH as u32).try_into().unwrap(),y), Size::new(BARWIDTH.into(),height)).into_styled(PrimitiveStyle::with_fill(c))
     };
-    b.PDM.sample.maxcnt.write(|w|{ w.bits(SAMPLECOUNT.into()) });
     let mut buf_to_display: usize = 0;
     let mut buf_to_capture: usize = 1;
-    b.PDM.sample.ptr.write(|w| { w.bits(pdmbuffers[buf_to_capture].as_ptr() as u32)} );
-    b.PDM.tasks_start.write(|w| { w.tasks_start().set_bit() });
+    mic.set_sample_buffer(&pdmbuffers[buf_to_capture]);
+    mic.start_sampling();
     loop {
         // compute bucketed average of the buffer to display
         for b in 0..BUCKETCOUNT {
@@ -93,10 +72,9 @@ unsafe fn main() -> ! {
         }
         (buf_to_capture,buf_to_display) = if buf_to_capture == 0 { (1,0) } else { (0,1) };
         // Wait for the current buffer capture to complete, then start on the flipped buffer
-        let sampling_started = &b.PDM.events_started;
-        while !sampling_started.read().events_started().bit_is_set() {}
-        sampling_started.write(|w| { w.events_started().clear_bit() });
-        b.PDM.sample.ptr.write(|w| { w.bits(pdmbuffers[buf_to_capture].as_ptr() as u32)} );
+        while !mic.sampling_started() {}
+        mic.clear_sampling_started();
+        mic.set_sample_buffer(&pdmbuffers[buf_to_capture]);
     }
 }
 
