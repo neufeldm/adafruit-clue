@@ -273,6 +273,45 @@ impl Button {
     }
 }
 
+#[derive(Clone,Copy,PartialEq)]
+pub enum ButtonState {
+    UNKNOWN,
+    PRESSED,
+    RELEASED,
+}
+
+pub struct ButtonUpDown {
+    button: Button,
+    prev_state: ButtonState,
+}
+
+impl ButtonUpDown {
+    pub fn new(button: Button) -> Self {
+        ButtonUpDown {
+            button: button,
+            prev_state: ButtonState::UNKNOWN,
+        }
+    }
+    pub fn pressed(&self) -> bool {
+        self.button.pressed()
+    }
+    pub fn update_state(&mut self) -> (ButtonState,ButtonState) {
+        let prev_state_orig = self.prev_state;
+        let cur_state = match self.pressed() {
+            false => ButtonState::RELEASED,
+            true => ButtonState::PRESSED
+        };
+        self.prev_state = cur_state;
+        (prev_state_orig,cur_state)
+    }
+    pub fn button_down(&mut self) -> bool {
+        self.update_state() == (ButtonState::RELEASED,ButtonState::PRESSED)
+    }
+    pub fn button_up(&mut self) -> bool {
+        self.update_state() == (ButtonState::PRESSED,ButtonState::RELEASED)
+    }
+}
+
 /// Control pins for the Clue TFT
 pub struct TFT {
     pub sck: Pin<Output<PushPull>>,
@@ -344,7 +383,7 @@ impl Microphone {
     }
     pub const MIN_GAIN_HALFDB: i8 = -40;
     pub const MAX_GAIN_HALFDB: i8 = 40;
-    pub fn set_gain(&self,half_db_gain: i8) {
+    pub fn set_gain(&self,half_db_gain: i8) -> i8 {
         let mut g = half_db_gain;
         unsafe {
             if half_db_gain < Microphone::MIN_GAIN_HALFDB {
@@ -358,6 +397,7 @@ impl Microphone {
             self.pdm.gainl.write(|w| { w.gainl().bits(g as u8) } );
             self.pdm.gainr.write(|w| { w.gainr().bits(g as u8) } );
         }
+        g
     }
 
     pub fn start_sampling(&self) {
@@ -370,6 +410,70 @@ impl Microphone {
 
     pub fn clear_sampling_started(&self) {
         self.pdm.events_started.write(|w| { w.events_started().clear_bit() });
+    }
+
+    pub fn stop_sampling(&self) {
+        self.pdm.tasks_stop.write(|w| { w.tasks_stop().set_bit() });
+    }
+    pub fn sampling_stopped(&self) -> bool {
+        self.pdm.events_stopped.read().events_stopped().bit_is_set()
+    }
+    pub fn clear_sampling_stopped(&self) {
+        self.pdm.events_stopped.write(|w| { w.events_stopped().clear_bit() });
+    }
+
+    pub fn sampling_ended(&self) -> bool {
+        self.pdm.events_end.read().events_end().bit_is_set()
+    }
+
+    pub const IRQ_SAMPLING_STARTED: u32 = 0b001;
+    pub const IRQ_SAMPLING_STOPPED: u32 = 0b010;
+    pub const IRQ_SAMPLING_ENDED: u32 = 0b100;
+    pub const IRQ_SAMPLING_ALL: u32 = 0b111;
+    pub const IRQ_SAMPLING_NONE: u32 = 0b000;
+    pub fn enable_interrupts(&self) {
+        unsafe {
+            self.pdm.inten.write(|w| { w.bits(Microphone::IRQ_SAMPLING_ALL) })
+        }
+    }
+
+    pub fn disable_interrupts(&self) {
+        unsafe {
+            self.pdm.inten.write(|w| { w.bits(Microphone::IRQ_SAMPLING_NONE) })
+        }
+    }
+
+    pub fn enable_started_interrupt(&self) {
+        unsafe {
+            self.pdm.intenset.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STARTED) } )
+        }
+    }
+    pub fn disable_started_interrupt(&self) {
+        unsafe {
+            self.pdm.intenclr.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STARTED) } )
+        }
+    }
+
+    pub fn enable_stopped_interrupt(&self) {
+        unsafe {
+            self.pdm.intenset.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STOPPED) } )
+        }
+    }
+    pub fn disable_stopped_interrupt(&self) {
+        unsafe {
+            self.pdm.intenclr.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STOPPED) } )
+        }
+    }
+
+    pub fn enable_ended_interrupt(&self) {
+        unsafe {
+            self.pdm.intenset.write(|w| { w.bits(Microphone::IRQ_SAMPLING_ENDED) } )
+        }
+    }
+    pub fn disable_ended_interrupt(&self) {
+        unsafe {
+            self.pdm.intenclr.write(|w| { w.bits(Microphone::IRQ_SAMPLING_ENDED) } )
+        }
     }
 
 }

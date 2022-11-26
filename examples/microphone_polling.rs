@@ -2,7 +2,7 @@
 #![no_std]
 
 use core::convert::TryInto;
-use adafruit_clue::{Board,TFT,Microphone};
+use adafruit_clue::{Board,TFT,Microphone,ButtonUpDown};
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
 use nrf52840_hal::clocks::Clocks;
@@ -32,13 +32,17 @@ fn main() -> ! {
     display.set_orientation(Orientation::Landscape).unwrap();
     display.clear(Rgb565::BLACK).unwrap();
 
+    // allow setting the gain dynamically using the buttons
+    let buttons = b.buttons;
+    let mut decrease_gain = ButtonUpDown::new(buttons.button_a);
+    let mut increase_gain = ButtonUpDown::new(buttons.button_b);
     // we need the high frequency oscillator enabled for the microphone
     let c = Clocks::new(b.CLOCK);
     c.enable_ext_hfosc();
     let mut mic = Microphone::new(b.PDM);
     mic.enable();
-
-    // XXX leaving gain, etc. at default values for now...
+    let mut gain: i8 = 0;
+    mic.set_gain(gain);
     const SAMPLECOUNT: u16 = 2048;
     const BUCKETCOUNT: usize = 120;
     // will drop some off at the end if they don't divide evenly, but going to ignore that
@@ -54,6 +58,8 @@ fn main() -> ! {
     let mut buf_to_capture: usize = 1;
     mic.set_sample_buffer(&pdmbuffers[buf_to_capture]);
     mic.start_sampling();
+    decrease_gain.update_state();
+    increase_gain.update_state();
     loop {
         // compute bucketed average of the buffer to display
         for b in 0..BUCKETCOUNT {
@@ -72,7 +78,19 @@ fn main() -> ! {
         }
         (buf_to_capture,buf_to_display) = if buf_to_capture == 0 { (1,0) } else { (0,1) };
         // Wait for the current buffer capture to complete, then start on the flipped buffer
-        while !mic.sampling_started() {}
+        while !mic.sampling_started() {
+            let mut gain_change: i8 = 0;
+            if increase_gain.button_up() {
+                gain_change += 1;
+            }
+            if decrease_gain.button_up() {
+                gain_change -= 1;
+            }
+            if gain_change != 0 {
+                gain += gain_change;
+                gain = mic.set_gain(gain);
+            }
+        }
         mic.clear_sampling_started();
         mic.set_sample_buffer(&pdmbuffers[buf_to_capture]);
     }
