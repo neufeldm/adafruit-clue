@@ -2,9 +2,9 @@
 #![no_std]
 
 use adafruit_clue::Board;
-use nrf52840_hal::Timer;
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
+use nrf52840_hal::Timer;
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
@@ -21,9 +21,7 @@ fn main() -> ! {
         b.leds.white.on();
         timer.delay_ms(100 as u32);
     }
-
 }
-
 
 #[panic_handler] // panicking behavior
 fn panic(_: &core::panic::PanicInfo) -> ! {

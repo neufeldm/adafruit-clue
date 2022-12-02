@@ -4,9 +4,9 @@
 use adafruit_clue::Board;
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
-use nrf52840_hal::Timer;
 use nrf52840_hal::clocks::Clocks;
 use nrf52840_hal::usbd::{UsbPeripheral, Usbd};
+use nrf52840_hal::Timer;
 use usb_device::device::{UsbDeviceBuilder, UsbVidPid};
 use usbd_serial::{SerialPort, USB_CLASS_CDC};
 

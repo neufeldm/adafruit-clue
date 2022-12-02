@@ -205,23 +205,22 @@ pub struct Pins {
     //pub SCK: p0::P0_08<Disconnected>, // (GPIO D13 / SCK)
     //pub MISO: p0::P0_06<Disconnected>, // (GPIO D14 / MISO)
     //pub MOSI: p0::P0_26<Disconnected>, // (GPIO D15 / MOSI)
-
     pub neopixel: p0::P0_16<Disconnected>, // (NeoPixel)
 
     pub pdm_data: p0::P0_00<Input<Floating>>, // (PDM DAT)
     pub pdm_clock: p0::P0_01<Output<PushPull>>, // (PDM CLOCK)
 
-    //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
-    //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
-    //pub SPEAKER: p1::P1_00, // (Speaker/buzzer)
+                                              //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
+                                              //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
+                                              //pub SPEAKER: p1::P1_00, // (Speaker/buzzer)
 
-    // QSPI pins (not exposed via any header / test point)
-    //pub QSPI_CLK: p0::P0_19, // (QSPI CLK)
-    //pub QSPI_CS: p0::P0_20, // (QSPI CS)
-    //pub QSPI_DATA0: p0::P0_17, // (QSPI Data 0)
-    //pub QSPI_DATA1: p0::P0_22, // (QSPI Data 1)
-    //pub QSPI_DATA2: p0::P0_23, // (QSPI Data 2)
-    //pub QSPI_DATA3: p0::P0_21, // (QSPI Data 3)
+                                              // QSPI pins (not exposed via any header / test point)
+                                              //pub QSPI_CLK: p0::P0_19, // (QSPI CLK)
+                                              //pub QSPI_CS: p0::P0_20, // (QSPI CS)
+                                              //pub QSPI_DATA0: p0::P0_17, // (QSPI Data 0)
+                                              //pub QSPI_DATA1: p0::P0_22, // (QSPI Data 1)
+                                              //pub QSPI_DATA2: p0::P0_23, // (QSPI Data 2)
+                                              //pub QSPI_DATA3: p0::P0_21, // (QSPI Data 3)
 }
 
 /// The LEDs on the Adafruit Clue
@@ -273,7 +272,7 @@ impl Button {
     }
 }
 
-#[derive(Clone,Copy,PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ButtonState {
     UNKNOWN,
     PRESSED,
@@ -295,20 +294,20 @@ impl ButtonUpDown {
     pub fn pressed(&self) -> bool {
         self.button.pressed()
     }
-    pub fn update_state(&mut self) -> (ButtonState,ButtonState) {
+    pub fn update_state(&mut self) -> (ButtonState, ButtonState) {
         let prev_state_orig = self.prev_state;
         let cur_state = match self.pressed() {
             false => ButtonState::RELEASED,
-            true => ButtonState::PRESSED
+            true => ButtonState::PRESSED,
         };
         self.prev_state = cur_state;
-        (prev_state_orig,cur_state)
+        (prev_state_orig, cur_state)
     }
     pub fn button_down(&mut self) -> bool {
-        self.update_state() == (ButtonState::RELEASED,ButtonState::PRESSED)
+        self.update_state() == (ButtonState::RELEASED, ButtonState::PRESSED)
     }
     pub fn button_up(&mut self) -> bool {
-        self.update_state() == (ButtonState::PRESSED,ButtonState::RELEASED)
+        self.update_state() == (ButtonState::PRESSED, ButtonState::RELEASED)
     }
 }
 
@@ -345,9 +344,7 @@ pub struct Microphone {
 
 impl Microphone {
     pub fn new(pdm: pac::PDM) -> Self {
-        Microphone {
-            pdm: pdm,
-        }
+        Microphone { pdm: pdm }
     }
     pub fn enable(&mut self) {
         // configure the PDM to use the correct pins
@@ -358,15 +355,13 @@ impl Microphone {
             }
             w.connect().clear_bit()
         });
-        self.pdm.psel.din.write(|w| {
-            unsafe {
-                w.port().bit(Board::PDM_DATA_PORT);
-                w.pin().bits(Board::PDM_DATA_PIN);
-                w.connect().clear_bit()
-            }
+        self.pdm.psel.din.write(|w| unsafe {
+            w.port().bit(Board::PDM_DATA_PORT);
+            w.pin().bits(Board::PDM_DATA_PIN);
+            w.connect().clear_bit()
         });
         // enable the PDM
-        self.pdm.enable.write(|w| { w.enable().set_bit() });
+        self.pdm.enable.write(|w| w.enable().set_bit());
         // mono/rising edge
         self.pdm.mode.write(|w| {
             w.operation().set_bit();
@@ -375,15 +370,15 @@ impl Microphone {
     }
     pub fn enable_interrupt() {}
     pub fn disable_interrupt() {}
-    pub fn set_sample_buffer(&self,buf: &[u16]) {
+    pub fn set_sample_buffer(&self, buf: &[u16]) {
         unsafe {
-            self.pdm.sample.ptr.write(|w| { w.bits(buf.as_ptr() as u32) });
-            self.pdm.sample.maxcnt.write(|w|{ w.bits(buf.len() as u32) });
+            self.pdm.sample.ptr.write(|w| w.bits(buf.as_ptr() as u32));
+            self.pdm.sample.maxcnt.write(|w| w.bits(buf.len() as u32));
         }
     }
     pub const MIN_GAIN_HALFDB: i8 = -40;
     pub const MAX_GAIN_HALFDB: i8 = 40;
-    pub fn set_gain(&self,half_db_gain: i8) -> i8 {
+    pub fn set_gain(&self, half_db_gain: i8) -> i8 {
         let mut g = half_db_gain;
         unsafe {
             if half_db_gain < Microphone::MIN_GAIN_HALFDB {
@@ -394,14 +389,14 @@ impl Microphone {
             // The gain is offset by the minimum gain to 0, so adjust
             // the signed value here to match what the register wants.
             g -= Microphone::MIN_GAIN_HALFDB;
-            self.pdm.gainl.write(|w| { w.gainl().bits(g as u8) } );
-            self.pdm.gainr.write(|w| { w.gainr().bits(g as u8) } );
+            self.pdm.gainl.write(|w| w.gainl().bits(g as u8));
+            self.pdm.gainr.write(|w| w.gainr().bits(g as u8));
         }
         g
     }
 
     pub fn start_sampling(&self) {
-        self.pdm.tasks_start.write(|w| { w.tasks_start().set_bit() });
+        self.pdm.tasks_start.write(|w| w.tasks_start().set_bit());
     }
 
     pub fn sampling_started(&self) -> bool {
@@ -409,17 +404,21 @@ impl Microphone {
     }
 
     pub fn clear_sampling_started(&self) {
-        self.pdm.events_started.write(|w| { w.events_started().clear_bit() });
+        self.pdm
+            .events_started
+            .write(|w| w.events_started().clear_bit());
     }
 
     pub fn stop_sampling(&self) {
-        self.pdm.tasks_stop.write(|w| { w.tasks_stop().set_bit() });
+        self.pdm.tasks_stop.write(|w| w.tasks_stop().set_bit());
     }
     pub fn sampling_stopped(&self) -> bool {
         self.pdm.events_stopped.read().events_stopped().bit_is_set()
     }
     pub fn clear_sampling_stopped(&self) {
-        self.pdm.events_stopped.write(|w| { w.events_stopped().clear_bit() });
+        self.pdm
+            .events_stopped
+            .write(|w| w.events_stopped().clear_bit());
     }
 
     pub fn sampling_ended(&self) -> bool {
@@ -433,47 +432,62 @@ impl Microphone {
     pub const IRQ_SAMPLING_NONE: u32 = 0b000;
     pub fn enable_interrupts(&self) {
         unsafe {
-            self.pdm.inten.write(|w| { w.bits(Microphone::IRQ_SAMPLING_ALL) })
+            self.pdm
+                .inten
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_ALL))
         }
     }
 
     pub fn disable_interrupts(&self) {
         unsafe {
-            self.pdm.inten.write(|w| { w.bits(Microphone::IRQ_SAMPLING_NONE) })
+            self.pdm
+                .inten
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_NONE))
         }
     }
 
     pub fn enable_started_interrupt(&self) {
         unsafe {
-            self.pdm.intenset.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STARTED) } )
+            self.pdm
+                .intenset
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_STARTED))
         }
     }
     pub fn disable_started_interrupt(&self) {
         unsafe {
-            self.pdm.intenclr.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STARTED) } )
+            self.pdm
+                .intenclr
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_STARTED))
         }
     }
 
     pub fn enable_stopped_interrupt(&self) {
         unsafe {
-            self.pdm.intenset.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STOPPED) } )
+            self.pdm
+                .intenset
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_STOPPED))
         }
     }
     pub fn disable_stopped_interrupt(&self) {
         unsafe {
-            self.pdm.intenclr.write(|w| { w.bits(Microphone::IRQ_SAMPLING_STOPPED) } )
+            self.pdm
+                .intenclr
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_STOPPED))
         }
     }
 
     pub fn enable_ended_interrupt(&self) {
         unsafe {
-            self.pdm.intenset.write(|w| { w.bits(Microphone::IRQ_SAMPLING_ENDED) } )
+            self.pdm
+                .intenset
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_ENDED))
         }
     }
     pub fn disable_ended_interrupt(&self) {
         unsafe {
-            self.pdm.intenclr.write(|w| { w.bits(Microphone::IRQ_SAMPLING_ENDED) } )
+            self.pdm
+                .intenclr
+                .write(|w| w.bits(Microphone::IRQ_SAMPLING_ENDED))
         }
     }
-
 }
