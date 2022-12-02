@@ -155,6 +155,7 @@ impl Board {
                 neopixel: pins0.p0_16,
                 pdm_data: pins0.p0_00.into_floating_input(),
                 pdm_clock: pins0.p0_01.into_push_pull_output(Level::Low),
+                speaker: pins1.p1_00.into_push_pull_output(Level::Low),
             },
             tft: TFT {
                 sck: pins0.p0_14.into_push_pull_output(Level::Low).degrade(),
@@ -208,10 +209,10 @@ pub struct Pins {
     pub pdm_data: p0::P0_00<Input<Floating>>, // (PDM DAT)
     pub pdm_clock: p0::P0_01<Output<PushPull>>, // (PDM CLOCK)
 
+    pub speaker: p1::P1_00<Output<PushPull>>, // speaker/buzzer "toggle"
+
                                               //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
                                               //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
-                                              //pub SPEAKER: p1::P1_00, // (Speaker/buzzer)
-
                                               // QSPI pins (not exposed via any header / test point)
                                               //pub QSPI_CLK: p0::P0_19, // (QSPI CLK)
                                               //pub QSPI_CS: p0::P0_20, // (QSPI CS)
