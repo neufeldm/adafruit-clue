@@ -1,6 +1,7 @@
 #![no_main]
 #![no_std]
 
+use adafruit_clue::prelude::OutputPin;
 use adafruit_clue::{Board, ButtonUpDown, Microphone, TFT};
 use core::convert::TryInto;
 use cortex_m_rt;
@@ -17,14 +18,16 @@ use st7789::{Orientation, ST7789};
 #[cortex_m_rt::entry]
 fn main() -> ! {
     let mut b = Board::take().unwrap();
-    b.tft.backlight_on();
+    b.tft.backlight.set_high().unwrap();
     // TFT SPI
-    let tft_pins = spim::Pins {
-        sck: b.tft.sck,
-        miso: None,
-        mosi: Some(b.tft.mosi),
-    };
-    let tft_spi = spim::Spim::new(b.SPIM0, tft_pins, spim::Frequency::M8, spim::MODE_3, 122);
+    let tft_spim_pins = adafruit_clue::tft_spim_pins(b.tft.sck, b.tft.mosi);
+    let tft_spi = spim::Spim::new(
+        b.SPIM0,
+        tft_spim_pins,
+        spim::Frequency::M8,
+        spim::MODE_3,
+        122,
+    );
     let tft_display_interface = SPIInterfaceNoCS::new(tft_spi, b.tft.dc);
     let mut display = ST7789::new(tft_display_interface, b.tft.reset, TFT::XSIZE, TFT::YSIZE);
     let mut delay = Delay::new(b.core_peripherals.SYST);

@@ -19,9 +19,7 @@ pub mod prelude {
 use nrf52840_hal::{
     gpio::{p0, p1, Disconnected, Floating, Input, Level, Output, Pin, PullUp, PushPull},
     pac::{self as pac, CorePeripherals, Peripherals},
-    //spim,
-    //spim::{self, Frequency, Spim, MODE_0},
-    //uarte::{self, Baudrate as UartBaudrate, Parity as UartParity, Uarte},
+    spim, twim,
 };
 
 use embedded_hal::digital::v2::{InputPin, OutputPin};
@@ -324,11 +322,13 @@ pub struct TFT {
 impl TFT {
     pub const XSIZE: u16 = 240;
     pub const YSIZE: u16 = 240;
-    pub fn backlight_on(&mut self) {
-        self.backlight.set_high().unwrap();
-    }
-    pub fn backlight_off(&mut self) {
-        self.backlight.set_low().unwrap();
+}
+
+pub fn tft_spim_pins(sck: Pin<Output<PushPull>>, mosi: Pin<Output<PushPull>>) -> spim::Pins {
+    spim::Pins {
+        sck: sck,
+        miso: None,
+        mosi: Some(mosi),
     }
 }
 
@@ -336,6 +336,13 @@ impl TFT {
 pub struct I2C {
     pub sda: Pin<Input<Floating>>,
     pub scl: Pin<Input<Floating>>,
+}
+
+pub fn sensor_twim_pins(si2c: I2C) -> twim::Pins {
+    twim::Pins {
+        scl: si2c.scl,
+        sda: si2c.sda,
+    }
 }
 
 pub struct Microphone {
