@@ -49,11 +49,15 @@ pub struct Board {
     pub USBD: pac::USBD,
     pub CLOCK: pac::CLOCK,
     pub PDM: pac::PDM,
+    pub PWM0: pac::PWM0,
+    pub PWM1: pac::PWM1,
+    pub PWM2: pac::PWM2,
+    pub PWM3: pac::PWM3,
+    pub GPIOTE: pac::GPIOTE,
 
     /// The nRF52's pins which are not otherwise occupied on the nRF52840-DK
     pub pins: Pins,
 
-    // XXX mneufeld clue is supposed to have 2MB of QSPI flash - figure this out
     /// The LEDs on the Clue
     pub leds: Leds,
 
@@ -138,6 +142,11 @@ impl Board {
             USBD: p.USBD,
             CLOCK: p.CLOCK,
             PDM: p.PDM,
+            PWM0: p.PWM0,
+            PWM1: p.PWM1,
+            PWM2: p.PWM2,
+            PWM3: p.PWM3,
+            GPIOTE: p.GPIOTE,
 
             pins: Pins {
                 a0: pins0.p0_31,
@@ -156,6 +165,8 @@ impl Board {
                 pdm_data: pins0.p0_00.into_floating_input(),
                 pdm_clock: pins0.p0_01.into_push_pull_output(Level::Low),
                 speaker: pins1.p1_00.into_push_pull_output(Level::Low),
+                accel_gyro_irq: pins1.p1_06.into_floating_input(),
+                prox_light_irq: pins0.p0_09.into_floating_input(),
             },
             tft: TFT {
                 sck: pins0.p0_14.into_push_pull_output(Level::Low).degrade(),
@@ -206,20 +217,20 @@ pub struct Pins {
     //pub MOSI: p0::P0_26<Disconnected>, // (GPIO D15 / MOSI)
     pub neopixel: p0::P0_16<Disconnected>, // (NeoPixel)
 
-    pub pdm_data: p0::P0_00<Input<Floating>>, // (PDM DAT)
+    pub pdm_data: p0::P0_00<Input<Floating>>,   // (PDM DAT)
     pub pdm_clock: p0::P0_01<Output<PushPull>>, // (PDM CLOCK)
 
     pub speaker: p1::P1_00<Output<PushPull>>, // speaker/buzzer "toggle"
 
-                                              //pub ACCELEROMETER_GYRO_INTERRUPT: p1::P1_06<Disconnected>, // (LSM6DS33 IRQ)
-                                              //pub PROXIMITY_LIGHT_INTERRUPT: p0::P0_09<Disconnected>, // (APDS IRQ)
-                                              // QSPI pins (not exposed via any header / test point)
-                                              //pub QSPI_CLK: p0::P0_19, // (QSPI CLK)
-                                              //pub QSPI_CS: p0::P0_20, // (QSPI CS)
-                                              //pub QSPI_DATA0: p0::P0_17, // (QSPI Data 0)
-                                              //pub QSPI_DATA1: p0::P0_22, // (QSPI Data 1)
-                                              //pub QSPI_DATA2: p0::P0_23, // (QSPI Data 2)
-                                              //pub QSPI_DATA3: p0::P0_21, // (QSPI Data 3)
+    pub accel_gyro_irq: p1::P1_06<Input<Floating>>, // (LSM6DS33 IRQ)
+    pub prox_light_irq: p0::P0_09<Input<Floating>>, // (APDS IRQ)
+                                                    // QSPI pins (not exposed via any header / test point)
+                                                    //pub QSPI_CLK: p0::P0_19, // (QSPI CLK)
+                                                    //pub QSPI_CS: p0::P0_20, // (QSPI CS)
+                                                    //pub QSPI_DATA0: p0::P0_17, // (QSPI Data 0)
+                                                    //pub QSPI_DATA1: p0::P0_22, // (QSPI Data 1)
+                                                    //pub QSPI_DATA2: p0::P0_23, // (QSPI Data 2)
+                                                    //pub QSPI_DATA3: p0::P0_21, // (QSPI Data 3)
 }
 
 /// The LEDs on the Adafruit Clue
@@ -231,21 +242,25 @@ pub struct Leds {
 }
 
 /// An LED control pin
-pub struct Led(Pin<Output<PushPull>>);
+pub struct Led {
+    pub pin: Pin<Output<PushPull>>,
+}
 
 impl Led {
     fn new<Mode>(pin: Pin<Mode>) -> Self {
-        Led(pin.into_push_pull_output(Level::Low))
+        Led {
+            pin: pin.into_push_pull_output(Level::Low),
+        }
     }
 
     /// Turn the LED on
     pub fn on(&mut self) {
-        self.0.set_high().unwrap()
+        self.pin.set_high().unwrap()
     }
 
     /// Turn the LED off
     pub fn off(&mut self) {
-        self.0.set_low().unwrap()
+        self.pin.set_low().unwrap()
     }
 }
 
