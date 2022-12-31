@@ -1,7 +1,7 @@
 //! Board support for Adafruit CLUE:
 //! https://www.adafruit.com/product/4500
 //!
-//! Heavily based on existing board support crates:
+//! Based on existing board support crates:
 //! https://github.com/nrf-rs/nrf52840-dk
 //! https://github.com/nrf-rs/adafruit-nrf52-bluefruit-le
 
@@ -19,7 +19,7 @@ pub mod prelude {
 use nrf52840_hal::{
     gpio::{p0, p1, Disconnected, Floating, Input, Level, Output, Pin, PullUp, PushPull},
     pac::{self as pac, CorePeripherals, Peripherals},
-    spim, twim,
+    pwm, spim, twim,
 };
 
 use embedded_hal::digital::v2::{InputPin, OutputPin};
@@ -161,7 +161,7 @@ impl Board {
                 d7: pins0.p0_07,
                 d8: pins1.p1_07,
                 d9: pins0.p0_27,
-                neopixel: pins0.p0_16,
+                neopixel: pins0.p0_16.into_push_pull_output(Level::Low),
                 pdm_data: pins0.p0_00.into_floating_input(),
                 pdm_clock: pins0.p0_01.into_push_pull_output(Level::Low),
                 speaker: pins1.p1_00.into_push_pull_output(Level::Low),
@@ -169,12 +169,12 @@ impl Board {
                 prox_light_irq: pins0.p0_09.into_floating_input(),
             },
             tft: TFT {
-                sck: pins0.p0_14.into_push_pull_output(Level::Low).degrade(),
-                mosi: pins0.p0_15.into_push_pull_output(Level::Low).degrade(),
-                cs: pins0.p0_12.into_push_pull_output(Level::Low).degrade(),
-                dc: pins0.p0_13.into_push_pull_output(Level::Low).degrade(),
-                reset: pins1.p1_03.into_push_pull_output(Level::Low).degrade(),
-                backlight: pins1.p1_05.into_push_pull_output(Level::Low).degrade(),
+                sck: Some(pins0.p0_14.into_push_pull_output(Level::Low).degrade()),
+                mosi: Some(pins0.p0_15.into_push_pull_output(Level::Low).degrade()),
+                cs: Some(pins0.p0_12.into_push_pull_output(Level::Low).degrade()),
+                dc: Some(pins0.p0_13.into_push_pull_output(Level::Low).degrade()),
+                reset: Some(pins1.p1_03.into_push_pull_output(Level::Low).degrade()),
+                backlight: Some(pins1.p1_05.into_push_pull_output(Level::Low).degrade()),
             },
             leds: Leds {
                 red: Led::new(pins1.p1_01.degrade()),
@@ -187,8 +187,8 @@ impl Board {
             },
 
             sensors_i2c: I2C {
-                sda: pins0.p0_24.into_floating_input().degrade(),
-                scl: pins0.p0_25.into_floating_input().degrade(),
+                sda: Some(pins0.p0_24.into_floating_input().degrade()),
+                scl: Some(pins0.p0_25.into_floating_input().degrade()),
             },
         }
     }
@@ -196,7 +196,7 @@ impl Board {
 
 /// The nRF52 pins that are available on the Adafruit Clue
 pub struct Pins {
-    // XXX similar to circuitpython names here...
+    // XXX similar to circuitpython names here - would arduino be better?
     pub a0: p0::P0_31<Disconnected>, // (GPIO D12 / AIN0)
     pub a1: p0::P0_29<Disconnected>, // (GPIO D16 / AIN1)
     pub a2: p0::P0_04<Disconnected>, // (GPIO D0 / AIN2 / UART RX)
@@ -211,11 +211,11 @@ pub struct Pins {
     pub d8: p1::P1_07<Disconnected>, // (GPIO D8)
     pub d9: p0::P0_27<Disconnected>, // (GPIO D9)
 
-    // XXX resolve these
+    // XXX figure these out
     //pub SCK: p0::P0_08<Disconnected>, // (GPIO D13 / SCK)
     //pub MISO: p0::P0_06<Disconnected>, // (GPIO D14 / MISO)
     //pub MOSI: p0::P0_26<Disconnected>, // (GPIO D15 / MOSI)
-    pub neopixel: p0::P0_16<Disconnected>, // (NeoPixel)
+    pub neopixel: p0::P0_16<Output<PushPull>>, // (NeoPixel)
 
     pub pdm_data: p0::P0_00<Input<Floating>>,   // (PDM DAT)
     pub pdm_clock: p0::P0_01<Output<PushPull>>, // (PDM CLOCK)
@@ -327,37 +327,56 @@ impl ButtonUpDown {
 
 /// Control pins for the Clue TFT
 pub struct TFT {
-    pub sck: Pin<Output<PushPull>>,
-    pub mosi: Pin<Output<PushPull>>,
-    pub cs: Pin<Output<PushPull>>,
-    pub dc: Pin<Output<PushPull>>,
-    pub reset: Pin<Output<PushPull>>,
-    pub backlight: Pin<Output<PushPull>>,
+    pub sck: Option<Pin<Output<PushPull>>>,
+    pub mosi: Option<Pin<Output<PushPull>>>,
+    pub cs: Option<Pin<Output<PushPull>>>,
+    pub dc: Option<Pin<Output<PushPull>>>,
+    pub reset: Option<Pin<Output<PushPull>>>,
+    pub backlight: Option<Pin<Output<PushPull>>>,
 }
 
 impl TFT {
     pub const XSIZE: u16 = 240;
     pub const YSIZE: u16 = 240;
-}
-
-pub fn tft_spim_pins(sck: Pin<Output<PushPull>>, mosi: Pin<Output<PushPull>>) -> spim::Pins {
-    spim::Pins {
-        sck: sck,
-        miso: None,
-        mosi: Some(mosi),
+    pub fn spim_pins(&mut self) -> spim::Pins {
+        spim::Pins {
+            sck: self.sck.take().unwrap(),
+            miso: None,
+            mosi: self.mosi.take(),
+        }
+    }
+    pub fn spim<T: nrf52840_hal::spim::Instance>(&mut self, rawspim: T) -> hal::Spim<T> {
+        spim::Spim::new(
+            rawspim,
+            self.spim_pins(),
+            spim::Frequency::M8,
+            spim::MODE_3,
+            122,
+        )
+    }
+    pub fn backlight_on(&mut self) {
+        self.backlight.as_mut().unwrap().set_high().unwrap();
+    }
+    pub fn backlight_off(&mut self) {
+        self.backlight.as_mut().unwrap().set_low().unwrap();
     }
 }
 
 /// I2C pins for Clue sensors
 pub struct I2C {
-    pub sda: Pin<Input<Floating>>,
-    pub scl: Pin<Input<Floating>>,
+    pub sda: Option<Pin<Input<Floating>>>,
+    pub scl: Option<Pin<Input<Floating>>>,
 }
 
-pub fn sensor_twim_pins(si2c: I2C) -> twim::Pins {
-    twim::Pins {
-        scl: si2c.scl,
-        sda: si2c.sda,
+impl I2C {
+    pub fn twim_pins(&mut self) -> twim::Pins {
+        twim::Pins {
+            scl: self.scl.take().unwrap(),
+            sda: self.sda.take().unwrap(),
+        }
+    }
+    pub fn twim<T: nrf52840_hal::twim::Instance>(&mut self, rawtwim: T) -> hal::Twim<T> {
+        twim::Twim::new(rawtwim, self.twim_pins(), twim::Frequency::K400)
     }
 }
 
@@ -511,6 +530,87 @@ impl Microphone {
             self.pdm
                 .intenclr
                 .write(|w| w.bits(Microphone::IRQ_SAMPLING_ENDED))
+        }
+    }
+}
+
+// PWM NeoPixel
+const PWM_NEOPIXEL_0: u16 = 0x8005;
+const PWM_NEOPIXEL_1: u16 = 0x800d;
+const PWM_NEOPIXEL_LATCH: u16 = 0x8000;
+const PWM_NEOPIXEL_RGB_BITS: usize = 24;
+const PWM_NEOPIXEL_GREEN_START: usize = 0;
+const PWM_NEOPIXEL_GREEN_END: usize = 8;
+const PWM_NEOPIXEL_RED_START: usize = 8;
+const PWM_NEOPIXEL_RED_END: usize = 16;
+const PWM_NEOPIXEL_BLUE_START: usize = 16;
+const PWM_NEOPIXEL_BLUE_END: usize = 24;
+const PWM_NEOPIXEL_LATCH_CYCLES: usize = 40;
+const PWM_NEOPIXEL_LATCH_START: usize = 24;
+pub const PWM_NEOPIXEL_SEQ_SIZE: usize = PWM_NEOPIXEL_RGB_BITS + PWM_NEOPIXEL_LATCH_CYCLES;
+
+pub struct PWMNeoPixel<P: nrf52840_hal::pwm::Instance> {
+    pwmdev: Option<pwm::Pwm<P>>,
+    buf: Option<&'static mut [u16; PWM_NEOPIXEL_SEQ_SIZE]>,
+}
+
+impl<P: nrf52840_hal::pwm::Instance + core::fmt::Debug> PWMNeoPixel<P> {
+    pub fn new(
+        rawpwm: P,
+        pin: Pin<Output<PushPull>>,
+        buf: &'static mut [u16; PWM_NEOPIXEL_SEQ_SIZE],
+    ) -> Self {
+        let pwmdev = pwm::Pwm::new(rawpwm);
+        pwmdev.set_output_pin(pwm::Channel::C0, pin);
+        pwmdev.enable();
+        pwmdev
+            .set_counter_mode(pwm::CounterMode::Up)
+            .set_prescaler(pwm::Prescaler::Div1) // 16MHz clock
+            .set_max_duty(20) // 20 16Mhz clicks -> 800kHz
+            .set_load_mode(pwm::LoadMode::Common)
+            .set_seq_refresh(pwm::Seq::Seq0, 0)
+            .set_seq_end_delay(pwm::Seq::Seq0, 0)
+            .one_shot();
+        for i in PWM_NEOPIXEL_LATCH_START..PWM_NEOPIXEL_SEQ_SIZE {
+            buf[i] = PWM_NEOPIXEL_LATCH;
+        }
+        PWMNeoPixel {
+            pwmdev: Some(pwmdev),
+            buf: Some(buf),
+        }
+    }
+
+    fn set_color_noblock(&mut self, red: u8, green: u8, blue: u8) {
+        let buf = self.buf.take().unwrap();
+        for i in PWM_NEOPIXEL_GREEN_START..PWM_NEOPIXEL_GREEN_END {
+            buf[i] = PWMNeoPixel::<P>::pwm_bit_from_byte(green, i - PWM_NEOPIXEL_GREEN_START);
+        }
+        for i in PWM_NEOPIXEL_RED_START..PWM_NEOPIXEL_RED_END {
+            buf[i] = PWMNeoPixel::<P>::pwm_bit_from_byte(red, i - PWM_NEOPIXEL_RED_START);
+        }
+        for i in PWM_NEOPIXEL_BLUE_START..PWM_NEOPIXEL_BLUE_END {
+            buf[i] = PWMNeoPixel::<P>::pwm_bit_from_byte(blue, i - PWM_NEOPIXEL_BLUE_START);
+        }
+        let pwmdev = self.pwmdev.take().unwrap();
+        pwmdev.reset_event(pwm::PwmEvent::SeqStarted(pwm::Seq::Seq0));
+        pwmdev.reset_event(pwm::PwmEvent::SeqEnd(pwm::Seq::Seq0));
+        let r = pwmdev
+            .load(Some(buf), None::<&[u16; PWM_NEOPIXEL_SEQ_SIZE]>, true)
+            .unwrap()
+            .split();
+        self.pwmdev = Some(r.2);
+        self.buf = r.0;
+    }
+    pub fn set_color(&mut self, red: u8, green: u8, blue: u8) {
+        self.set_color_noblock(red, green, blue);
+        while self.pwmdev.as_ref().unwrap().event_seq0_end().read().bits() == 0 {}
+    }
+
+    fn pwm_bit_from_byte(val: u8, bit: usize) -> u16 {
+        if val & (0x1 << (7 - bit)) == 0 {
+            PWM_NEOPIXEL_0
+        } else {
+            PWM_NEOPIXEL_1
         }
     }
 }

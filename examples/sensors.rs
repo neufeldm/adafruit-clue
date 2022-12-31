@@ -1,11 +1,10 @@
 #![no_main]
 #![no_std]
 
-use adafruit_clue::prelude::OutputPin;
 use adafruit_clue::{Board, TFT};
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
-use nrf52840_hal::{spim, twim, Delay, Timer};
+use nrf52840_hal::{Delay, Timer};
 // accelerometer/Gyro
 use lsm6ds33::Lsm6ds33;
 use lsm6ds33::{AccelerometerBandwidth, AccelerometerOutput, AccelerometerScale};
@@ -40,8 +39,7 @@ use heapless::String;
 #[cortex_m_rt::entry]
 fn main() -> ! {
     let mut b = Board::take().unwrap();
-    let sensor_i2c_pins = adafruit_clue::sensor_twim_pins(b.sensors_i2c);
-    let sensor_i2c = twim::Twim::new(b.TWIM1, sensor_i2c_pins, twim::Frequency::K400);
+    let sensor_i2c = b.sensors_i2c.twim(b.TWIM1);
     let shared_sensor_i2c = shared_bus::BusManagerSimple::new(sensor_i2c);
     let mut gyro_accel =
         Lsm6ds33::new(shared_sensor_i2c.acquire_i2c(), Board::I2C_GYROACCEL).unwrap();
@@ -91,18 +89,16 @@ fn main() -> ! {
     let humidity_i2c = shared_sensor_i2c.acquire_i2c();
     let mut humidity = sht3x::SHT3x::new(humidity_i2c, sht3x::Address::Low);
 
-    b.tft.backlight.set_high().unwrap();
     // TFT SPI
-    let tft_spim_pins = adafruit_clue::tft_spim_pins(b.tft.sck, b.tft.mosi);
-    let tft_spi = spim::Spim::new(
-        b.SPIM0,
-        tft_spim_pins,
-        spim::Frequency::M8,
-        spim::MODE_3,
-        122,
+    b.tft.backlight_on();
+    let tft_display_interface =
+        SPIInterfaceNoCS::new(b.tft.spim(b.SPIM0), b.tft.dc.take().unwrap());
+    let mut display = ST7789::new(
+        tft_display_interface,
+        b.tft.reset.take().unwrap(),
+        TFT::XSIZE,
+        TFT::YSIZE,
     );
-    let tft_display_interface = SPIInterfaceNoCS::new(tft_spi, b.tft.dc);
-    let mut display = ST7789::new(tft_display_interface, b.tft.reset, TFT::XSIZE, TFT::YSIZE);
     let mut delay = Delay::new(b.core_peripherals.SYST);
     display.init(&mut delay).unwrap();
     display.set_orientation(Orientation::Landscape).unwrap();
