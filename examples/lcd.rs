@@ -1,12 +1,10 @@
 #![no_main]
 #![no_std]
 
-use adafruit_clue::prelude::OutputPin;
 use adafruit_clue::Board;
 use adafruit_clue::TFT;
 use cortex_m_rt;
 use embedded_hal::blocking::delay::DelayMs;
-use nrf52840_hal::spim;
 use nrf52840_hal::Delay;
 use nrf52840_hal::Timer;
 
@@ -25,18 +23,16 @@ fn main() -> ! {
     let mut b = Board::take().unwrap();
     let mut timer = Timer::new(b.TIMER4);
 
-    b.tft.backlight.set_high().unwrap();
     // TFT SPI
-    let tft_spi_pins = adafruit_clue::tft_spim_pins(b.tft.sck, b.tft.mosi);
-    let tft_spi = spim::Spim::new(
-        b.SPIM0,
-        tft_spi_pins,
-        spim::Frequency::M8,
-        spim::MODE_3,
-        122,
+    b.tft.backlight_on();
+    let tft_display_interface =
+        SPIInterfaceNoCS::new(b.tft.spim(b.SPIM0), b.tft.dc.take().unwrap());
+    let mut display = ST7789::new(
+        tft_display_interface,
+        b.tft.reset.take().unwrap(),
+        TFT::XSIZE,
+        TFT::YSIZE,
     );
-    let tft_display_interface = SPIInterfaceNoCS::new(tft_spi, b.tft.dc);
-    let mut display = ST7789::new(tft_display_interface, b.tft.reset, TFT::XSIZE, TFT::YSIZE);
     let mut delay = Delay::new(b.core_peripherals.SYST);
     display.init(&mut delay).unwrap();
     display.set_orientation(Orientation::Landscape).unwrap();
