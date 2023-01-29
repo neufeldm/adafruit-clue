@@ -7,7 +7,6 @@
 
 #![no_std]
 
-pub use cortex_m;
 pub use embedded_hal;
 pub use nrf52840_hal as hal;
 
