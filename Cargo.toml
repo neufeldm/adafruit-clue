@@ -38,8 +38,17 @@ usb-device = "0.2.9"
 usbd-serial = "0.1.1"
 
 [features]
+nrf-s140-v6 = []
+nrf-s140-v7 = []
 rt = ["nrf52840-hal/rt"]
-default = ["rt"]
+# To build this library standalone add either "nrf-s140-v6" or "nrf-s140-v7"
+# to the default features. If you've got a stock Clue, then just use
+# "nrf-s140-v6" - you'll only need the -v7 if you've actively reflashed
+# with a bootloader containing version 7 of the S140 SoftDevice.
+#default = ["rt"]
+#default = ["rt","nrf-s140-v6"]
+#default = ["rt","nrf-s140-v7"]
+
 
 [profile.release]
 strip = true  # Automatically strip symbols from the binary.
